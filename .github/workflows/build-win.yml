@@ -52,7 +52,13 @@ jobs:
           cp config.env.sample dist_pkg/
           cp start.ps1 dist_pkg/
           echo "BMW Air-Gap Paket: 1) optional config.env erstellen 2) .\\start.ps1" > dist_pkg/README_DEPLOY.txt
-          cd dist_pkg && powershell -Command "Compress-Archive -Path * -DestinationPath ../release_win.zip -Force"
+          cd dist_pkg && powershell -Command "Compress-Archive -Path * -DestinationPath ../release_win.zip -Force" 
+      - name: Debug dist folder
+        shell: bash
+        run: |
+          echo "Listing dist and dist_pkg"
+          ls -R dist || true
+          ls -R dist_pkg || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
