@@ -1,0 +1,61 @@
+name: build-win
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+          pip install pyinstaller pipdeptree
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          python app/main.py & PID=$!
+          sleep 3
+          curl -sSfI http://127.0.0.1:8082 | head -n1
+          STATUS=$?
+          kill $PID || true
+          exit $STATUS
+
+      - name: Build single-file exe
+        run: |
+          pyinstaller --onefile --name app app/main.py
+        shell: powershell
+
+      - name: SBOM / Freeze
+        run: |
+          pip freeze > sbom_requirements.lock
+          pipdeptree --warn silence > sbom_deptree.txt
+
+      - name: Assemble artifact
+        shell: bash
+        run: |
+          mkdir -p dist_pkg/bin
+          cp dist/app.exe dist_pkg/bin/
+          cp -r templates dist_pkg/ 2>/dev/null || true
+          cp -r static dist_pkg/ 2>/dev/null || true
+          cp config.env.sample dist_pkg/
+          cp start.ps1 dist_pkg/
+          echo "BMW Air-Gap Paket: 1) optional config.env erstellen 2) .\\start.ps1" > dist_pkg/README_DEPLOY.txt
+          cd dist_pkg && powershell -Command "Compress-Archive -Path * -DestinationPath ../release_win.zip -Force"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release_win
+          path: dist/release_win.zip
